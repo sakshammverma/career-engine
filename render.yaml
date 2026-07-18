@@ -1,0 +1,22 @@
+# Render blueprint — deploys the FastAPI career engine as a free web service.
+# In the Render dashboard: New + > Blueprint > point at this repo.
+# After the first deploy, set GROQ_API_KEY in the service's Environment tab
+# (it is intentionally not stored in this file).
+services:
+  - type: web
+    name: career-engine
+    runtime: python
+    plan: free
+    rootDir: career-engine
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: GROQ_API_KEY
+        sync: false # set manually in the dashboard, never committed
+      - key: CORS_ORIGINS
+        value: http://localhost:3000 # append your Vercel URL after frontend deploy
+      - key: CAREER_DB
+        value: career.db # NOTE: free tier disk is ephemeral; data resets on deploy

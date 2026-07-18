@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+/* Design tokens — validated dataviz palette (light + dark are both selected
+   sets, not an automatic flip). Chart marks use --accent (series-1 blue);
+   text always wears ink tokens, never series color. */
+:root {
+  --surface-1: #fcfcfb;
+  --plane: #f9f9f7;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+  --hairline: rgba(11, 11, 11, 0.1);
+  --accent: #2a78d6;      /* categorical slot 1 (light) */
+  --accent-strong: #1c5cab;
+  --accent-soft: #cde2fb; /* sequential 100 */
+  --accent-track: #b7d3f6;/* sequential 150 — meter track, same ramp */
+  --good: #0ca30c;
+  --good-text: #006300;
+  --warning: #fab219;
+  --critical: #d03b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface-1: #1a1a19;
+    --plane: #0d0d0d;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --hairline: rgba(255, 255, 255, 0.1);
+    --accent: #3987e5;    /* categorical slot 1 (dark step) */
+    --accent-strong: #6da7ec;
+    --accent-soft: #104281;
+    --accent-track: #184f95;
+    --good: #0ca30c;
+    --good-text: #0ca30c;
+  }
+}
+
+@theme inline {
+  --color-surface: var(--surface-1);
+  --color-plane: var(--plane);
+  --color-ink: var(--ink);
+  --color-ink2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-grid: var(--grid);
+  --color-baseline: var(--baseline);
+  --color-hairline: var(--hairline);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-track: var(--accent-track);
+  --color-good: var(--good);
+  --color-goodtext: var(--good-text);
+  --color-warning: var(--warning);
+  --color-critical: var(--critical);
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--plane);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Recessive custom scrollbar for chat panes */
+.thin-scroll::-webkit-scrollbar { width: 6px; }
+.thin-scroll::-webkit-scrollbar-thumb { background: var(--baseline); border-radius: 3px; }
