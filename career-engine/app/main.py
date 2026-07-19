@@ -57,7 +57,7 @@ _default_origins = "http://localhost:3000,http://127.0.0.1:3000"
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        o.strip()
+        o.strip().rstrip("/")  # a pasted trailing slash must not break matching
         for o in os.environ.get("CORS_ORIGINS", _default_origins).split(",")
         if o.strip()
     ],
