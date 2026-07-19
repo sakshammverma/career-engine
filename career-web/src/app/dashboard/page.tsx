@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
-import { api, Dashboard, STUDENT_KEY } from "@/lib/api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api, Dashboard, STUDENT_KEY, warmUp } from "@/lib/api";
 import ReadinessHero from "@/components/ReadinessHero";
 import StatTiles from "@/components/StatTiles";
 import { NextSteps, SkillGapBars } from "@/components/GapsAndSteps";
@@ -15,6 +15,9 @@ import {
 } from "@/components/PlanAndOpportunities";
 import MentorChat from "@/components/MentorChat";
 import ProgressPanel from "@/components/ProgressPanel";
+import ThemeToggle from "@/components/ThemeToggle";
+import WakingOverlay from "@/components/WakingOverlay";
+import Toast, { ToastData } from "@/components/Toast";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -22,9 +25,13 @@ export default function DashboardPage() {
   const [dash, setDash] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [waking, setWaking] = useState(false);
+  const [wakeElapsed, setWakeElapsed] = useState(0);
+  const [wakeFailed, setWakeFailed] = useState(false);
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const toastSeq = useRef(0);
 
-  useEffect(() => {
-    // Deep-link support: /dashboard?sid=<id> adopts that student.
+  const load = useCallback(async () => {
     const fromQuery = new URLSearchParams(window.location.search).get("sid");
     if (fromQuery) localStorage.setItem(STUDENT_KEY, fromQuery);
     const id = fromQuery ?? localStorage.getItem(STUDENT_KEY);
@@ -33,44 +40,91 @@ export default function DashboardPage() {
       return;
     }
     setStudentId(id);
-    api
-      .dashboard(id)
-      .then(setDash)
-      .catch((e) => {
-        // Unknown student (server restarted with a fresh DB) -> re-onboard.
-        if (String(e).includes("404")) {
-          localStorage.removeItem(STUDENT_KEY);
-          router.replace("/onboarding");
-        } else {
-          setError(
-            "Could not reach the engine API on :8000. Start it with `uvicorn app.main:app` in career-engine.",
-          );
-        }
-      });
+    setWakeFailed(false);
+
+    // Wake the engine first (no-op when already warm), with visible progress.
+    setWaking(true);
+    const awake = await warmUp(setWakeElapsed);
+    if (!awake) {
+      setWaking(false);
+      setWakeFailed(true);
+      return;
+    }
+    try {
+      setDash(await api.dashboard(id));
+      setWaking(false);
+    } catch (e) {
+      setWaking(false);
+      if (String(e).includes("404")) {
+        // Server restarted with a fresh DB — profile is gone; re-onboard.
+        localStorage.removeItem(STUDENT_KEY);
+        router.replace("/onboarding");
+      } else {
+        setError("Something went wrong talking to the engine. Try a refresh.");
+      }
+    }
   }, [router]);
 
-  // All mutations return the freshly recomputed dashboard; hold the previous
-  // render at reduced opacity while swapping (no skeleton flash).
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // All mutations return the freshly recomputed dashboard. Show the readiness
+  // delta as a toast — the "route recalculated" moment.
   const mutate = useCallback(
-    async (fn: () => Promise<Dashboard>) => {
+    async (fn: () => Promise<Dashboard>, silent = false) => {
       setRefreshing(true);
       try {
-        setDash(await fn());
+        const before = dash?.readiness.readiness_pct ?? 0;
+        const next = await fn();
+        setDash(next);
+        if (!silent) {
+          const delta =
+            Math.round((next.readiness.readiness_pct - before) * 10) / 10;
+          toastSeq.current += 1;
+          if (delta !== 0) {
+            setToast({
+              id: toastSeq.current,
+              kind: delta > 0 ? "up" : "down",
+              title: `Readiness ${delta > 0 ? "+" : ""}${delta} pts → ${next.readiness.readiness_pct}%`,
+              body: "Route recalculated",
+            });
+          } else {
+            setToast({
+              id: toastSeq.current,
+              kind: "info",
+              title: "Route recalculated",
+            });
+          }
+        }
       } finally {
         setRefreshing(false);
       }
     },
-    [],
+    [dash],
   );
+
+  if (wakeFailed || waking)
+    return (
+      <WakingOverlay
+        elapsed={wakeElapsed}
+        failed={wakeFailed}
+        onRetry={load}
+      />
+    );
 
   if (error)
     return (
       <main className="flex-1 grid place-items-center px-6">
         <div className="max-w-md text-center">
           <p className="text-sm text-critical">{error}</p>
-          <Link href="/" className="mt-4 inline-block text-sm text-accent">
-            ← Home
-          </Link>
+          <button
+            type="button"
+            onClick={load}
+            className="mt-4 rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white hover:bg-accent-strong transition-colors"
+          >
+            Retry
+          </button>
         </div>
       </main>
     );
@@ -78,33 +132,29 @@ export default function DashboardPage() {
   if (!dash || !studentId)
     return (
       <main className="flex-1 grid place-items-center">
-        <p className="text-sm text-muted animate-pulse">
-          Computing your route…
-        </p>
+        <p className="text-sm text-muted anim-pulse">Computing your route…</p>
       </main>
     );
 
   return (
     <main className="flex-1">
       {/* Top bar */}
-      <header className="border-b border-hairline bg-surface/60 backdrop-blur sticky top-0 z-10">
-        <div className="mx-auto max-w-6xl px-6 py-3 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
+      <header className="border-b border-hairline bg-surface/70 backdrop-blur sticky top-0 z-10">
+        <div className="mx-auto max-w-6xl px-6 py-3 flex items-center justify-between gap-3">
+          <Link href="/" className="flex items-center gap-2 shrink-0">
             <span className="inline-block h-2.5 w-2.5 rounded-full bg-accent" />
             <span className="font-semibold tracking-tight">CareerMap</span>
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
             {refreshing && (
-              <span className="text-xs text-muted animate-pulse">
-                recalculating route…
+              <span className="hidden sm:inline text-xs text-muted anim-pulse">
+                recalculating…
               </span>
             )}
             <button
               type="button"
-              onClick={() =>
-                mutate(() => api.advanceSemester(studentId))
-              }
-              className="text-xs text-ink2 hover:text-ink border border-hairline rounded-lg px-3 py-1.5 transition-colors"
+              onClick={() => mutate(() => api.advanceSemester(studentId))}
+              className="text-xs text-ink2 hover:text-ink border border-hairline rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap"
               title="Move to the next semester and replan"
             >
               Advance semester →
@@ -115,32 +165,35 @@ export default function DashboardPage() {
                 localStorage.removeItem(STUDENT_KEY);
                 router.push("/onboarding");
               }}
-              className="text-xs text-muted hover:text-ink2 transition-colors"
+              className="hidden sm:inline text-xs text-muted hover:text-ink2 transition-colors"
             >
               New profile
             </button>
+            <ThemeToggle />
           </div>
         </div>
       </header>
 
       <div
-        className={`mx-auto max-w-6xl px-6 py-8 space-y-6 transition-opacity ${
+        className={`mx-auto max-w-6xl px-6 py-8 space-y-6 transition-opacity duration-200 ${
           refreshing ? "opacity-60" : "opacity-100"
         }`}
       >
         {/* Hero + tiles */}
-        <ReadinessHero dash={dash} />
+        <div className="anim-fade-up">
+          <ReadinessHero dash={dash} />
+        </div>
         <StatTiles dash={dash} />
 
         {/* Main grid */}
         <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6 stagger">
             <NextSteps dash={dash} />
             <RoadmapTimeline dash={dash} />
             <WeeklyPlanList dash={dash} />
             <OpportunityList dash={dash} />
           </div>
-          <div className="space-y-6">
+          <div className="space-y-6 stagger">
             <ProgressPanel
               dash={dash}
               onSetSkill={(skill, level) =>
@@ -158,6 +211,8 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      <Toast toast={toast} onDone={() => setToast(null)} />
     </main>
   );
 }

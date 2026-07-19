@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { api, STUDENT_KEY, StudentProfile } from "@/lib/api";
+import { api, STUDENT_KEY, StudentProfile, warmUp } from "@/lib/api";
+import ThemeToggle from "@/components/ThemeToggle";
+import WakingOverlay from "@/components/WakingOverlay";
 
 /* ------------------------------------------------------------------ */
 /* Static option data                                                  */
@@ -101,6 +104,9 @@ export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [waking, setWaking] = useState(false);
+  const [wakeElapsed, setWakeElapsed] = useState(0);
+  const [wakeFailed, setWakeFailed] = useState(false);
 
   // form state
   const [semester, setSemester] = useState(3);
@@ -130,9 +136,37 @@ export default function Onboarding() {
     certifications: 0,
   });
 
+  // Quick demo fill — lets a visitor feel the product in one click.
+  function fillSample() {
+    setSemester(3);
+    setTier(2);
+    setUniversity("AKTU");
+    setBranch("CSE");
+    setCgpa("7.8");
+    setRole("backend");
+    setSalary(10);
+    setWorkMode("hybrid");
+    setHours(3);
+    setBudget("free_only");
+    setStyle("project");
+    setLevels((prev) => ({
+      ...prev,
+      programming: 4,
+      dsa: 3,
+      python: 3,
+      sql: 2,
+      git: 3,
+      communication: 3,
+      english: 4,
+    }));
+    setExp((p) => ({ ...p, projects_completed: 2, resume_quality: 2 }));
+    setStep(STEPS.length - 1);
+  }
+
   async function submit() {
     setBusy(true);
     setError(null);
+    setWakeFailed(false);
     const profile: StudentProfile = {
       academic: {
         college_tier: tier,
@@ -165,13 +199,21 @@ export default function Onboarding() {
       experience: exp,
     };
     try {
+      // Wake the free-tier engine first (no-op when already warm).
+      setWaking(true);
+      const awake = await warmUp(setWakeElapsed);
+      if (!awake) {
+        setWaking(false);
+        setWakeFailed(true);
+        setBusy(false);
+        return;
+      }
       const { student_id } = await api.createStudent(profile);
       localStorage.setItem(STUDENT_KEY, student_id);
       router.push("/dashboard");
     } catch (e) {
-      setError(
-        `Could not reach the engine API. Is FastAPI running on :8000? (${String(e)})`,
-      );
+      setWaking(false);
+      setError(`Something went wrong creating your profile. (${String(e)})`);
       setBusy(false);
     }
   }
@@ -179,8 +221,39 @@ export default function Onboarding() {
   const canNext =
     step !== 1 || Boolean(role); /* role always set; guard kept for clarity */
 
+  if (waking || wakeFailed)
+    return (
+      <WakingOverlay
+        elapsed={wakeElapsed}
+        failed={wakeFailed}
+        onRetry={() => {
+          setWakeFailed(false);
+          submit();
+        }}
+      />
+    );
+
   return (
-    <main className="flex-1 mx-auto w-full max-w-2xl px-6 py-10">
+    <main className="flex-1 mx-auto w-full max-w-2xl px-6 py-8">
+      {/* Mini header */}
+      <div className="mb-8 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2">
+          <span className="inline-block h-2.5 w-2.5 rounded-full bg-accent" />
+          <span className="font-semibold tracking-tight">CareerMap</span>
+        </Link>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={fillSample}
+            className="text-xs text-muted hover:text-ink2 transition-colors"
+            title="Fill a realistic sample profile to try the product fast"
+          >
+            Try with sample data
+          </button>
+          <ThemeToggle />
+        </div>
+      </div>
+
       {/* Stepper */}
       <ol className="flex items-center gap-1 mb-10">
         {STEPS.map((s, i) => (
@@ -216,7 +289,10 @@ export default function Onboarding() {
         ))}
       </ol>
 
-      <div className="rounded-2xl border border-hairline bg-surface p-8">
+      <div
+        key={step}
+        className="anim-fade-up rounded-2xl border border-hairline bg-surface p-8"
+      >
         {/* STEP 0 — Academics */}
         {step === 0 && (
           <div className="space-y-5">

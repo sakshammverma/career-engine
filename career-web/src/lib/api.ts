@@ -190,6 +190,31 @@ async function j<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** Ping /health until the engine answers (Render free tier sleeps after ~15
+ * min idle and takes ~30-50s to wake). onTick reports elapsed seconds so the
+ * UI can show progress. Resolves true when awake, false if it never woke. */
+export async function warmUp(
+  onTick?: (elapsedSec: number) => void,
+  maxWaitSec = 90,
+): Promise<boolean> {
+  const started = Date.now();
+  for (;;) {
+    const elapsed = Math.round((Date.now() - started) / 1000);
+    if (elapsed > maxWaitSec) return false;
+    onTick?.(elapsed);
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch(`${API}/health`, { signal: ctrl.signal });
+      clearTimeout(t);
+      if (res.ok) return true;
+    } catch {
+      /* still asleep — keep trying */
+    }
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+}
+
 export const api = {
   roles: () => fetch(`${API}/roles`).then((r) => j<RoleGraph[]>(r)),
 

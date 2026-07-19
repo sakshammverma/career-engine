@@ -1,9 +1,10 @@
 @import "tailwindcss";
 
-/* Design tokens — validated dataviz palette (light + dark are both selected
-   sets, not an automatic flip). Chart marks use --accent (series-1 blue);
-   text always wears ink tokens, never series color. */
-:root {
+/* Design tokens — validated dataviz palette. Theme is driven by
+   [data-theme] on <html> (set pre-hydration in layout.tsx to avoid FOUC):
+   "light" | "dark", defaulting to the OS preference. */
+:root,
+html[data-theme="light"] {
   --surface-1: #fcfcfb;
   --plane: #f9f9f7;
   --ink: #0b0b0b;
@@ -22,23 +23,21 @@
   --critical: #d03b3b;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --surface-1: #1a1a19;
-    --plane: #0d0d0d;
-    --ink: #ffffff;
-    --ink-2: #c3c2b7;
-    --muted: #898781;
-    --grid: #2c2c2a;
-    --baseline: #383835;
-    --hairline: rgba(255, 255, 255, 0.1);
-    --accent: #3987e5;    /* categorical slot 1 (dark step) */
-    --accent-strong: #6da7ec;
-    --accent-soft: #104281;
-    --accent-track: #184f95;
-    --good: #0ca30c;
-    --good-text: #0ca30c;
-  }
+html[data-theme="dark"] {
+  --surface-1: #1a1a19;
+  --plane: #0d0d0d;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --baseline: #383835;
+  --hairline: rgba(255, 255, 255, 0.1);
+  --accent: #3987e5;      /* categorical slot 1 (dark step) */
+  --accent-strong: #6da7ec;
+  --accent-soft: #104281;
+  --accent-track: #184f95;
+  --good: #0ca30c;
+  --good-text: #0ca30c;
 }
 
 @theme inline {
@@ -70,6 +69,61 @@ body {
   color: var(--ink);
   font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* ---------- motion ---------- */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes meterFill {
+  from { width: 0; }
+}
+@keyframes softPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+.anim-fade-up { animation: fadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.anim-fade-in { animation: fadeIn 0.3s ease both; }
+.anim-toast   { animation: toastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.anim-meter   { animation: meterFill 0.9s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.anim-pulse   { animation: softPulse 1.6s ease-in-out infinite; }
+
+/* staggered children */
+.stagger > * { animation: fadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.stagger > *:nth-child(1) { animation-delay: 0.03s; }
+.stagger > *:nth-child(2) { animation-delay: 0.08s; }
+.stagger > *:nth-child(3) { animation-delay: 0.13s; }
+.stagger > *:nth-child(4) { animation-delay: 0.18s; }
+.stagger > *:nth-child(5) { animation-delay: 0.23s; }
+.stagger > *:nth-child(6) { animation-delay: 0.28s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up, .anim-fade-in, .anim-toast, .anim-meter,
+  .stagger > * { animation: none; }
+  html { scroll-behavior: auto; }
+}
+
+/* ---------- micro-interactions ---------- */
+.card-lift {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.card-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px -6px rgba(0, 0, 0, 0.12);
+}
+html[data-theme="dark"] .card-lift:hover {
+  box-shadow: 0 4px 18px -6px rgba(0, 0, 0, 0.55);
 }
 
 /* Recessive custom scrollbar for chat panes */

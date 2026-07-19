@@ -29,7 +29,7 @@ export function NextSteps({ dash }: { dash: Dashboard }) {
         {recs.map((r, i) => (
           <li
             key={r.skill_id}
-            className="flex items-start gap-3 rounded-xl border border-hairline p-4"
+            className="card-lift flex items-start gap-3 rounded-xl border border-hairline p-4"
           >
             <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent text-xs font-semibold text-white">
               {i + 1}
@@ -81,7 +81,7 @@ export function SkillGapBars({ dash }: { dash: Dashboard }) {
               <div className="relative mt-1.5 h-2.5 w-full rounded-full bg-plane border border-hairline">
                 {/* current level fill — slot-1 accent, rounded data end */}
                 <div
-                  className="absolute inset-y-0 left-0 rounded-full bg-accent"
+                  className="absolute inset-y-0 left-0 rounded-full bg-accent transition-[width] duration-500 ease-out"
                   style={{ width: `${cur}%` }}
                 />
                 {/* target tick — ink, not a color */}

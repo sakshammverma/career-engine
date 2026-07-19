@@ -35,11 +35,11 @@ export default function StatTiles({ dash }: { dash: Dashboard }) {
   ];
 
   return (
-    <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger">
       {tiles.map((t) => (
         <div
           key={t.label}
-          className="rounded-xl border border-hairline bg-surface p-5"
+          className="card-lift rounded-xl border border-hairline bg-surface p-5"
         >
           <p className="text-xs text-ink2">{t.label}</p>
           <p className="mt-1 text-2xl font-semibold tracking-tight">
